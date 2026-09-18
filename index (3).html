@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>El Gran Laberinto de Ratones con Gato y Poderes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background: linear-gradient(135deg, #fbcfe8 0%, #fed7aa 50%, #bae6fd 100%);
+            min-height: 100vh;
+            touch-action: manipulation;
+        }
+        .title-font {
+            font-family: 'Fredoka One', cursive;
+        }
+        .control-btn {
+            background: linear-gradient(145deg, #ffffff, #f1f5f9);
+            box-shadow: 0 8px 0 #cbd5e1, 0 15px 20px rgba(0,0,0,0.1);
+            transition: all 0.1s ease;
+        }
+        .control-btn:active {
+            transform: translateY(6px);
+            box-shadow: 0 2px 0 #cbd5e1, 0 5px 10px rgba(0,0,0,0.1);
+        }
+        @keyframes pulse-scale {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.12); }
+        }
+        .cheese-pulse {
+            animation: pulse-scale 1.5s infinite ease-in-out;
+        }
+        .invisible-mouse {
+            opacity: 0.35;
+            filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.8));
+        }
+        .giant-cat {
+            transform: scale(1.45) !important;
+            filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.9));
+            z-index: 10;
+        }
+        @keyframes float-text {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-35px); opacity: 0; }
+        }
+        .floating-alert {
+            animation: float-text 1.2s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-between p-2 md:p-3 min-h-screen text-slate-700 overflow-x-hidden">
+
+    <header class="w-full max-w-xl text-center mb-1">
+        <h1 class="title-font text-2xl md:text-3xl text-amber-600 drop-shadow-md flex items-center justify-center gap-2">
+            <span>🧀</span> Laberinto Mágico <span>🐱</span>
+        </h1>
+        <div class="grid grid-cols-2 md:flex md:justify-between items-center bg-white/80 backdrop-blur-md px-3 py-2 rounded-2xl shadow-lg mt-2 border-2 border-amber-200 text-xs md:text-base gap-2">
+            <div class="flex items-center gap-1 justify-center">
+                <span>⭐</span>
+                <span id="level-display" class="title-font text-pink-500">Nivel 1</span>
+            </div>
+            <div class="flex items-center gap-1 justify-center">
+                <span>❤️</span>
+                <span id="lives-display" class="title-font text-red-500">Vidas: 3</span>
+            </div>
+            <div class="flex items-center gap-1 justify-center">
+                <span>🎨</span>
+                <span id="score-display" class="title-font text-sky-500">Casillas: 0</span>
+            </div>
+            <div class="flex justify-center">
+                <button onclick="resetCurrentLevel()" class="bg-amber-100 hover:bg-amber-200 text-amber-700 px-3 py-1 rounded-xl font-bold shadow transition active:scale-95 text-xs md:text-sm">
+                    🔄 Reiniciar
+                </button>
+            </div>
+        </div>
+        <!-- Status banner for active powerups -->
+        <div id="powerup-status" class="mt-1 text-xs font-bold text-center text-purple-600 h-5"></div>
+    </header>
+
+    <main class="w-full max-w-md flex flex-col items-center justify-center my-auto relative">
+        <div id="game-container" class="relative bg-white/90 p-3 rounded-3xl shadow-2xl border-4 border-amber-300 w-full aspect-square flex items-center justify-center">
+            <div id="grid" class="grid w-full h-full gap-1 p-1 rounded-2xl bg-amber-50/50 relative"></div>
+            
+            <!-- Floating Notification Overlay -->
+            <div id="float-notification" class="absolute pointer-events-none text-lg md:text-2xl title-font font-bold z-30 opacity-0 transition-opacity"></div>
+
+            <!-- Win Modal -->
+            <div id="win-modal" class="absolute inset-0 bg-black/40 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center hidden z-40 p-6 text-center">
+                <div class="bg-white p-6 rounded-3xl shadow-2xl border-4 border-amber-400 max-w-xs w-full animate-bounce">
+                    <span class="text-5xl mb-2 block">🎉🧀✨</span>
+                    <h2 class="title-font text-2xl text-amber-600 mb-1">¡Delicioso!</h2>
+                    <p id="win-message" class="text-slate-600 font-bold mb-4 text-sm">¡Ayudaste al ratón a comer su queso!</p>
+                    <button onclick="nextLevel()" class="w-full bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500 text-white title-font py-3 px-6 rounded-2xl shadow-lg text-lg transform transition active:scale-95">
+                        Siguiente Nivel 🚀
+                    </button>
+                </div>
+            </div>
+
+            <!-- Game Over Modal -->
+            <div id="gameover-modal" class="absolute inset-0 bg-black/40 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center hidden z-40 p-6 text-center">
+                <div class="bg-white p-6 rounded-3xl shadow-2xl border-4 border-red-400 max-w-xs w-full">
+                    <span class="text-5xl mb-2 block">🙀🚫🐾</span>
+                    <h2 class="title-font text-2xl text-red-500 mb-1">¡Te has quedado sin vidas!</h2>
+                    <p class="text-slate-600 font-bold mb-4 text-sm">El gatito te alcanzó demasiadas veces.</p>
+                    <button onclick="restartFullGame()" class="w-full bg-gradient-to-r from-red-400 to-pink-500 hover:from-red-500 hover:to-pink-600 text-white title-font py-3 px-6 rounded-2xl shadow-lg text-lg transform transition active:scale-95">
+                        Volver a Empezar 🔄
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="w-full max-w-sm mt-2">
+        <div class="grid grid-cols-3 gap-2 justify-items-center">
+            <div></div>
+            <button onclick="movePlayer(0, -1)" class="control-btn w-14 h-14 rounded-2xl flex items-center justify-center text-2xl text-slate-700">⬆️</button>
+            <div></div>
+            <button onclick="movePlayer(-1, 0)" class="control-btn w-14 h-14 rounded-2xl flex items-center justify-center text-2xl text-slate-700">⬅️</button>
+            <button onclick="movePlayer(0, 1)" class="control-btn w-14 h-14 rounded-2xl flex items-center justify-center text-2xl text-slate-700">⬇️</button>
+            <button onclick="movePlayer(1, 0)" class="control-btn w-14 h-14 rounded-2xl flex items-center justify-center text-2xl text-slate-700">➡️</button>
+        </div>
+        <p class="text-center text-xs text-slate-500 mt-2 font-semibold">🔴 Invisibilidad | 🟡 +3 Vidas | 🔵 Gato Gigante</p>
+    </footer>
+
+    <script>
+        const MOUSE_IMAGE = "https://i.postimg.cc/MnMWP6km/raton-1.png";
+        const CAT_IMAGE = "https://i.postimg.cc/mtM4Cd7t/Untitled-design-(15).png";
+        
+        // Tipos de casilla / objetos en el mapa:
+        // 0: Vacío, 1: Muro, 2: Queso, 3: Inicio Ratón, 4: Inicio Gato
+        // 5: Círculo Rojo (Invisibilidad)
+        // 6: Círculo Amarillo (+3 Vidas)
+        // 7: Círculo Azul (Gato Crece)
+
+        const levels = [
+            {
+                size: 5,
+                map: [
+                    [3, 0, 5, 0, 4],
+                    [0, 1, 1, 0, 0],
+                    [0, 6, 0, 1, 0],
+                    [1, 1, 0, 7, 0],
+                    [0, 0, 0, 1, 2]
+                ]
+            },
+            {
+                size: 6,
+                map: [
+                    [3, 0, 1, 5, 0, 4],
+                    [0, 0, 1, 0, 1, 0],
+                    [0, 6, 1, 0, 1, 0],
+                    [0, 0, 0, 0, 0, 7],
+                    [1, 1, 0, 1, 1, 0],
+                    [0, 0, 0, 0, 1, 2]
+                ]
+            },
+            {
+                size: 7,
+                map: [
+                    [3, 0, 5, 1, 0, 0, 4],
+                    [1, 1, 0, 1, 6, 1, 0],
+                    [0, 0, 0, 0, 0, 1, 0],
+                    [0, 1, 7, 1, 0, 1, 0],
+                    [0, 0, 0, 1, 0, 0, 0],
+                    [1, 1, 0, 1, 1, 1, 0],
+                    [0, 0, 6, 0, 0, 0, 2]
+                ]
+            },
+            {
+                size: 8,
+                map: [
+                    [3, 0, 1, 5, 0, 0, 0, 4],
+                    [0, 0, 1, 0, 1, 6, 1, 0],
+                    [0, 1, 1, 0, 0, 0, 1, 0],
+                    [0, 7, 0, 0, 1, 0, 0, 0],
+                    [1, 1, 1, 0, 1, 1, 1, 0],
+                    [0, 0, 6, 0, 0, 0, 1, 0],
+                    [0, 1, 1, 1, 1, 0, 1, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 2]
+                ]
+            }
+        ];
+
+        let currentLevelIndex = 0;
+        let currentMap = [];
+        let playerPos = { x: 0, y: 0 };
+        let catPos = { x: 0, y: 0 };
+        let paintedTiles = new Set();
+        let levelSize = 5;
+        let lives = 3;
+        
+        // Estados de poderes especiales
+        let isInvisible = false;
+        let invisibilityTurns = 0;
+        let isCatGiant = false;
+        let catGiantTurns = 0;
+
+        const pastelColors = [
+            'bg-pink-200', 'bg-purple-200', 'bg-sky-200', 
+            'bg-emerald-200', 'bg-amber-200', 'bg-rose-200', 'bg-indigo-200'
+        ];
+        let tileColorClass = pastelColors[0];
+
+        function initGame() {
+            document.getElementById('win-modal').classList.add('hidden');
+            document.getElementById('gameover-modal').classList.add('hidden');
+            
+            const levelData = levels[currentLevelIndex % levels.length];
+            levelSize = levelData.size;
+            tileColorClass = pastelColors[currentLevelIndex % pastelColors.length];
+            
+            currentMap = levelData.map.map(row => [...row]);
+            paintedTiles.clear();
+            isInvisible = false;
+            invisibilityTurns = 0;
+            isCatGiant = false;
+            catGiantTurns = 0;
+
+            // Buscar posiciones iniciales
+            for (let r = 0; r < levelSize; r++) {
+                for (let c = 0; c < levelSize; c++) {
+                    if (currentMap[r][c] === 3) {
+                        playerPos = { x: c, y: r };
+                        paintedTiles.add(`${c},${r}`);
+                    } else if (currentMap[r][c] === 4) {
+                        catPos = { x: c, y: r };
+                    }
+                }
+            }
+
+            document.getElementById('level-display').innerText = `Nivel ${currentLevelIndex + 1}`;
+            updateStats();
+            renderGrid();
+        }
+
+        function renderGrid() {
+            const gridEl = document.getElementById('grid');
+            gridEl.style.gridTemplateColumns = `repeat(${levelSize}, minmax(0, 1fr))`;
+            gridEl.style.gridTemplateRows = `repeat(${levelSize}, minmax(0, 1fr))`;
+            gridEl.innerHTML = '';
+
+            for (let r = 0; r < levelSize; r++) {
+                for (let c = 0; c < levelSize; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = "rounded-xl flex items-center justify-center transition-all duration-200 relative shadow-inner ";
+                    
+                    const cellType = currentMap[r][c];
+                    const key = `${c},${r}`;
+
+                    if (cellType === 1) {
+                        // Muro
+                        cell.className += "bg-slate-300 border-2 border-slate-400 shadow-md";
+                        cell.innerHTML = '<span class="text-xs opacity-60">🧱</span>';
+                    } else {
+                        // Casilla normal pintada o blanca
+                        if (paintedTiles.has(key)) {
+                            cell.className += `${tileColorClass} border border-white/60`;
+                        } else {
+                            cell.className += "bg-white border border-slate-100";
+                        }
+
+                        // Renderizar Objetivos y Poderes Especiales
+                        if (cellType === 2) {
+                            cell.innerHTML = '<span class="text-2xl cheese-pulse select-none">🧀</span>';
+                        } else if (cellType === 5) {
+                            cell.innerHTML = '<span class="text-xl select-none animate-pulse" title="Círculo Rojo: Invisibilidad">🔴</span>';
+                        } else if (cellType === 6) {
+                            cell.innerHTML = '<span class="text-xl select-none animate-pulse" title="Círculo Amarillo: +3 Vidas">🟡</span>';
+                        } else if (cellType === 7) {
+                            cell.innerHTML = '<span class="text-xl select-none animate-pulse" title="Círculo Azul: Gato Gigante">🔵</span>';
+                        }
+                    }
+
+                    // Mostrar Gato
+                    if (catPos.x === c && catPos.y === r) {
+                        let catClass = "w-4/5 h-4/5 object-contain transform select-none transition-all duration-300 ";
+                        if (isCatGiant) {
+                            catClass += "giant-cat";
+                        } else {
+                            catClass += "scale-110 drop-shadow-md";
+                        }
+                        cell.innerHTML = `<img src="${CAT_IMAGE}" alt="Gato" class="${catClass}" onerror="this.src='https://placehold.co/50x50/fed7aa/b91c1c?text=🐱'">`;
+                    }
+
+                    // Mostrar Ratón
+                    if (playerPos.x === c && playerPos.y === r) {
+                        let mouseClass = "w-4/5 h-4/5 object-contain select-none transition-all duration-300 ";
+                        if (isInvisible) {
+                            mouseClass += "invisible-mouse";
+                        } else {
+                            mouseClass += "transform scale-110 drop-shadow-md";
+                        }
+                        cell.innerHTML = `<img src="${MOUSE_IMAGE}" alt="Ratón" class="${mouseClass}" onerror="this.src='https://placehold.co/50x50/fed7aa/c2410c?text=🐁'">`;
+                    }
+
+                    gridEl.appendChild(cell);
+                }
+            }
+        }
+
+        function movePlayer(dx, dy) {
+            const newX = playerPos.x + dx;
+            const newY = playerPos.y + dy;
+
+            // Validar límites y muros
+            if (newX < 0 || newX >= levelSize || newY < 0 || newY >= levelSize) return;
+            if (currentMap[newY][newX] === 1) return; 
+
+            playerPos.x = newX;
+            playerPos.y = newY;
+            
+            const key = `${newX},${newY}`;
+            paintedTiles.add(key);
+
+            // Comprobar si recogió algún círculo especial
+            const tileContent = currentMap[newY][newX];
+            if (tileContent === 5) {
+                // Círculo Rojo: Invisibilidad por 4 turnos
+                isInvisible = true;
+                invisibilityTurns = 4;
+                currentMap[newY][newX] = 0; // Consumido
+                showFloatingNotification("¡Invisibilidad Activada! 🔴👻", "text-red-500");
+            } else if (tileContent === 6) {
+                // Círculo Amarillo: +3 Vidas
+                lives += 3;
+                currentMap[newY][newX] = 0; // Consumido
+                showFloatingNotification("¡+3 Vidas Extra! 🟡❤️", "text-amber-500");
+            } else if (tileContent === 7) {
+                // Círculo Azul: El gato crece por 4 turnos
+                isCatGiant = true;
+                catGiantTurns = 4;
+                currentMap[newY][newX] = 0; // Consumido
+                showFloatingNotification("¡Oh no! ¡El Gato Creció! 🔵🐱", "text-blue-500");
+            }
+
+            // Gestionar conteo de turnos de poderes
+            if (isInvisible) {
+                invisibilityTurns--;
+                if (invisibilityTurns <= 0) {
+                    isInvisible = false;
+                }
+            }
+            if (isCatGiant) {
+                catGiantTurns--;
+                if (catGiantTurns <= 0) {
+                    isCatGiant = false;
+                }
+            }
+
+            // Comprobar si colisiona con el gato (Si NO está invisible)
+            if (playerPos.x === catPos.x && playerPos.y === catPos.y) {
+                if (isInvisible) {
+                    showFloatingNotification("¡El gato no pudo verte! 🛡️", "text-purple-500");
+                } else {
+                    handleDamage();
+                    return;
+                }
+            }
+
+            // Mover el gato
+            moveCatSmartly();
+
+            // Comprobar colisión tras movimiento del gato
+            if (playerPos.x === catPos.x && playerPos.y === catPos.y) {
+                if (isInvisible) {
+                    showFloatingNotification("¡Atravesaste al gato invisible! 👻", "text-purple-500");
+                } else {
+                    handleDamage();
+                    return;
+                }
+            }
+            
+            updateStats();
+            renderGrid();
+
+            // Verificar si llegó al queso (Victoria)
+            if (tileContent === 2) {
+                setTimeout(showWinModal, 250);
+            }
+        }
+
+        function moveCatSmartly() {
+            const possibleMoves = [
+                { x: 0, y: -1 }, { x: 0, y: 1 }, 
+                { x: -1, y: 0 }, { x: 1, y: 0 }
+            ];
+
+            let bestMove = { x: catPos.x, y: catPos.y };
+            let minDistance = Infinity;
+
+            const randomness = currentLevelIndex === 0 ? 0.3 : 0.1;
+            if (Math.random() < randomness) {
+                const validMoves = possibleMoves.map(m => ({ x: catPos.x + m.x, y: catPos.y + m.y }))
+                    .filter(p => p.x >= 0 && p.x < levelSize && p.y >= 0 && p.y < levelSize && currentMap[p.y][p.x] !== 1);
+                if (validMoves.length > 0) {
+                    catPos = validMoves[Math.floor(Math.random() * validMoves.length)];
+                    return;
+                }
+            }
+
+            for (let move of possibleMoves) {
+                let nextX = catPos.x + move.x;
+                let nextY = catPos.y + move.y;
+
+                if (nextX >= 0 && nextX < levelSize && nextY >= 0 && nextY < levelSize) {
+                    if (currentMap[nextY][nextX] !== 1) {
+                        let dist = Math.abs(nextX - playerPos.x) + Math.abs(nextY - playerPos.y);
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                            bestMove = { x: nextX, y: nextY };
+                        }
+                    }
+                }
+            }
+            catPos = bestMove;
+        }
+
+        function handleDamage() {
+            lives--;
+            updateStats();
+            renderGrid();
+
+            if (lives <= 0) {
+                setTimeout(() => {
+                    document.getElementById('gameover-modal').classList.remove('hidden');
+                }, 200);
+            } else {
+                showFloatingNotification("¡Ay! El gato te atrapó (-1 vida) 😿", "text-red-500");
+                // Reposicionar al ratón y al gato al centro/inicio del nivel actual
+                resetPositionsOnly();
+            }
+        }
+
+        function resetPositionsOnly() {
+            const levelData = levels[currentLevelIndex % levels.length];
+            for (let r = 0; r < levelSize; r++) {
+                for (let c = 0; c < levelSize; c++) {
+                    if (levelData.map[r][c] === 3) {
+                        playerPos = { x: c, y: r };
+                        paintedTiles.add(`${c},${r}`);
+                    } else if (levelData.map[r][c] === 4) {
+                        catPos = { x: c, y: r };
+                    }
+                }
+            }
+            isInvisible = false;
+            invisibilityTurns = 0;
+            renderGrid();
+        }
+
+        function updateStats() {
+            document.getElementById('lives-display').innerText = `Vidas: ${lives}`;
+            document.getElementById('score-display').innerText = `Casillas: ${paintedTiles.size}`;
+            
+            let statusText = "";
+            if (isInvisible) statusText += `👻 Invisible (${invisibilityTurns} turnos) `;
+            if (isCatGiant) statusText += `🐾 Gato Gigante (${catGiantTurns} turnos)`;
+            document.getElementById('powerup-status').innerText = statusText;
+        }
+
+        function showFloatingNotification(text, colorClass) {
+            const notif = document.getElementById('float-notification');
+            notif.innerText = text;
+            notif.className = `absolute inset-0 flex items-center justify-center title-font font-bold text-lg md:text-2xl z-30 pointer-events-none floating-alert ${colorClass}`;
+            setTimeout(() => {
+                notif.className = "absolute pointer-events-none text-lg md:text-2xl title-font font-bold z-30 opacity-0 transition-opacity";
+            }, 1200);
+        }
+
+        function showWinModal() {
+            const modal = document.getElementById('win-modal');
+            const msg = document.getElementById('win-message');
+            msg.innerText = `¡Genial! Pintaste ${paintedTiles.size} casillas y llegaste al queso.`;
+            modal.classList.remove('hidden');
+        }
+
+        function nextLevel() {
+            currentLevelIndex++;
+            initGame();
+        }
+
+        function resetCurrentLevel() {
+            initGame();
+        }
+
+        function restartFullGame() {
+            currentLevelIndex = 0;
+            lives = 3;
+            initGame();
+        }
+
+        // Control por teclado
+        window.addEventListener('keydown', (e) => {
+            if (['ArrowUp', 'KeyW'].includes(e.code)) { movePlayer(0, -1); e.preventDefault(); }
+            if (['ArrowDown', 'KeyS'].includes(e.code)) { movePlayer(0, 1); e.preventDefault(); }
+            if (['ArrowLeft', 'KeyA'].includes(e.code)) { movePlayer(-1, 0); e.preventDefault(); }
+            if (['ArrowRight', 'KeyD'].includes(e.code)) { movePlayer(1, 0); e.preventDefault(); }
+        });
+
+        // Inicio del juego
+        window.onload = function () {
+            initGame();
+        };
+    </script>
+</body>
+</html>
